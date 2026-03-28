@@ -77,11 +77,15 @@ Bought in the **Upgrade Shop** using gold carried between runs.
 # 1. Navigate to the project directory
 cd "c:\Me\Proj\Eternal Dungeon"
 
-# 2. Install dependencies
-npm install
+### Install & Run
 
-# 3. Start the development server
-npx expo start
+```bash
+# 1. Install dependencies
+# (Use --legacy-peer-deps to handle React 18.3.1 peer conflicts in SDK 52)
+npm install --legacy-peer-deps
+
+# 2. Start the development server
+npx expo start --clear
 ```
 
 Then scan the QR code with **Expo Go** on your phone.
@@ -131,6 +135,16 @@ Eternal Dungeon/
 | [Zustand](https://zustand-demo.pmnd.rs/) | Lightweight state management |
 | [Reanimated 3](https://docs.swmansion.com/react-native-reanimated/) | 60fps animations (HP bars, floats, shakes) |
 | [AsyncStorage](https://react-native-async-storage.github.io/async-storage/) | Offline persistent saves |
+| [Node.js 18+](https://nodejs.org/) | Recommended runtime |
+
+---
+
+## 🛠️ Internal configuration (SDK 52 Fixes)
+
+To ensure stability with Expo SDK 52 and React 18.3.1, this project includes:
+
+- **Dependency Overrides**: Forced `react` and `react-dom` to version `18.3.1` in `package.json` to resolve `ERESOLVE` peer conflicts.
+- **Entry Point**: The `main` field is explicitly set to `expo/AppEntry.js` to ensure the root component is registered correctly (fixing potential `ConfigError` issues).
 
 ---
 
