@@ -140,6 +140,7 @@ export default function GameScreen({ navigation }) {
           enemy={enemy}
           floatingNumbers={floatingNumbers}
           removeFloatingNumber={removeFloatingNumber}
+          depth={depth}
         />
       </Animated.View>
 

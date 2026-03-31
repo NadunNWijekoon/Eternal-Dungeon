@@ -14,8 +14,8 @@ Eternal Dungeon is a fast-paced, addictive mobile roguelike where you **manually
 ## 🕹️ New: Virtual Battlefield
 
 Experience the dungeon like never before with our **Visual Battlefield**:
+- **Dynamic Graphical Environments**: High-quality pixel-art backgrounds cycle depending on your depth (Dark Forest, Ruined Village, Dungeon Crypt).
 - **Dynamic Animations**: See your hero lunge, dodge, and react to every hit in real-time.
-- **Arcade Visuals**: Neon-grid arenas, scanline overlays, and high-quality sprite effects.
 - **Spatial Feedback**: Damage numbers and status effects appear directly within the combat zone.
 
 ---

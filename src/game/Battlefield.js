@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ImageBackground } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -74,19 +74,24 @@ function AnimatedUnit({
   );
 }
 
+// ── Helper: Map depth to environment ──────────────────────────────
+const getBgImage = (depth) => {
+  if (!depth) return require('../../assets/images/forest.png');
+  // Cycle environments every 9 levels (3 levels per biome)
+  const cycle = depth % 9;
+  if (cycle === 0 || cycle > 6) return require('../../assets/images/dungeon.png'); // 7, 8, 9, 0
+  if (cycle > 3) return require('../../assets/images/village.png'); // 4, 5, 6
+  return require('../../assets/images/forest.png'); // 1, 2, 3
+};
+
 // ── Main Battlefield Arena ──────────────────────────────────────────
-export default function Battlefield({ player, enemy, floatingNumbers, removeFloatingNumber }) {
+export default function Battlefield({ player, enemy, floatingNumbers, removeFloatingNumber, depth }) {
+  const bgImg = getBgImage(depth);
+
   return (
-    <View style={styles.arena}>
-      {/* Background Grid */}
-      <View style={styles.gridContainer}>
-        {[...Array(6)].map((_, i) => (
-          <View key={`h-${i}`} style={[styles.gridLineH, { top: (ARENA_HEIGHT / 6) * i }]} />
-        ))}
-        {[...Array(8)].map((_, i) => (
-          <View key={`v-${i}`} style={[styles.gridLineV, { left: (width / 8) * i }]} />
-        ))}
-      </View>
+    <ImageBackground source={bgImg} style={styles.arena} imageStyle={styles.bgImageStyle}>
+      {/* Atmospheric dark gradient overlay for lower half to make sprites pop */}
+      <View style={styles.bottomShadow} />
 
       {/* Units */}
       <AnimatedUnit
@@ -106,9 +111,9 @@ export default function Battlefield({ player, enemy, floatingNumbers, removeFloa
         ))}
       </View>
 
-      {/* Scanline Overlay */}
+      {/* Scanline / Vibe Overlay */}
       <View style={styles.scanline} pointerEvents="none" />
-    </View>
+    </ImageBackground>
   );
 }
 
@@ -155,28 +160,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
     elevation: 10,
-    shadowColor: Colors.accent,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.5,
     shadowRadius: 10,
   },
-  gridContainer: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.8,
+  bgImageStyle: {
+    opacity: 0.9, // slight dim
   },
-  gridLineH: {
+  bottomShadow: {
     position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
-    height: 1,
-    backgroundColor: 'rgba(0, 242, 250, 0.05)',
-  },
-  gridLineV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: 'rgba(0, 242, 250, 0.05)',
+    height: '50%',
+    backgroundColor: 'rgba(0,0,0,0.4)', // Fades the floor slightly to help text pop
   },
   unitContainer: {
     position: 'absolute',
