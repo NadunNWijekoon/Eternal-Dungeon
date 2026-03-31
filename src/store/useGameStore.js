@@ -62,6 +62,9 @@ export const useGameStore = create((set, get) => ({
   floatingNumbers: [], // [{id, value, isCrit, x}]
   isPlayerDead: false,
   runGoldEarned: 0,
+  lastXpGained: 0,
+  lastGoldGained: 0,
+  isLevelingUp: false,
 
   // ── Persistence ───────────────────────────────────────────
   loadSave: async () => {
@@ -301,12 +304,30 @@ export const useGameStore = create((set, get) => ({
       phase: 'upgrade',
       gold: state.gold + earned,
       runGoldEarned: state.runGoldEarned + earned,
+      lastGoldGained: earned,
+      lastXpGained: xpGained,
+      isLevelingUp: newLevel > player.level,
       player: { ...state.player, xp: newXp, level: newLevel, maxXp: newMaxXp },
       upgradeChoices: choices,
       enemiesOnMap: newEnemiesOnMap,
       combatLog: [newLog, ...state.combatLog].slice(0, 20),
     }));
     get().saveGame();
+  },
+
+  // ── Manual Stat Allocation ────────────────────────────────
+  assignLevelUpStat: (statType) => {
+    const { player } = get();
+    let updates = {};
+    if (statType === 'hp') updates = { maxHp: player.maxHp + 20, hp: player.hp + 20 };
+    if (statType === 'mp') updates = { maxMana: player.maxMana + 15, mana: player.mana + 15 };
+    if (statType === 'atk') updates = { atk: player.atk + 3 };
+    if (statType === 'def') updates = { def: player.def + 1 };
+
+    set((state) => ({
+      player: { ...state.player, ...updates },
+      isLevelingUp: false,
+    }));
   },
 
   // ── Select an upgrade ─────────────────────────────────────

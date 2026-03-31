@@ -17,51 +17,45 @@ import Animated, {
 import { useGameStore } from '../store/useGameStore';
 import { Colors } from '../theme/colors';
 
-function UpgradeCard({ upgrade, index, onSelect }) {
-  const scale = useSharedValue(0.8);
-  const opacity = useSharedValue(0);
-
-  useEffect(() => {
-    const delay = index * 120;
-    setTimeout(() => {
-      scale.value = withSpring(1, { damping: 12, stiffness: 150 });
-      opacity.value = withSpring(1);
-    }, delay);
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
+function StatOption({ label, bonus, icon, onPress, disabled }) {
   return (
-    <Animated.View style={[styles.cardWrapper, animStyle]}>
-      <TouchableOpacity
-        style={[styles.card, upgrade.recommended && styles.cardRecommended]}
-        onPress={() => onSelect(upgrade)}
-        activeOpacity={0.8}
-      >
-        {upgrade.recommended && (
-          <View style={styles.recBadge}>
-            <Text style={styles.recText}>⭐ RECOMMENDED</Text>
-          </View>
-        )}
-        <Text style={styles.cardIcon}>{upgrade.icon}</Text>
-        <Text style={styles.cardName}>{upgrade.name}</Text>
-        <Text style={styles.cardDesc}>{upgrade.description}</Text>
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity
+      style={[styles.statOption, disabled && styles.disabledOption]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <Text style={styles.statIcon}>{icon}</Text>
+      <View style={styles.statInfo}>
+        <Text style={styles.statLabel}>{label}</Text>
+        <Text style={styles.statBonus}>{bonus}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 export default function UpgradeScreen({ navigation }) {
-  const { upgradeChoices, selectUpgrade, phase, depth } = useGameStore();
+  const {
+    player,
+    isLevelingUp,
+    lastXpGained,
+    lastGoldGained,
+    assignLevelUpStat,
+    phase,
+    depth,
+  } = useGameStore();
 
   useEffect(() => {
-    if (phase === 'battle') {
-      navigation.navigate('Game');
+    if (phase === 'explore') {
+      navigation.navigate('Explore');
     }
   }, [phase]);
+
+  const handleStatSelection = (statType) => {
+    assignLevelUpStat(statType);
+    // If we wanted Skill cards too, we'd wait, but for now we just finish.
+  };
+
+  const xpProgress = (player.xp / player.maxXp) * 100;
 
   const handleSelect = (upgrade) => {
     selectUpgrade(upgrade);
@@ -73,23 +67,51 @@ export default function UpgradeScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor={Colors.bg} />
 
       <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-        <Text style={styles.headerEmoji}>✨</Text>
+        <Text style={styles.headerEmoji}>🏆</Text>
         <Text style={styles.title}>VICTORY!</Text>
-        <Text style={styles.subtitle}>Depth {depth - 1} cleared — choose your reward</Text>
+        <Text style={styles.subtitle}>Enemies on Floor {depth} defeated</Text>
       </Animated.View>
 
-      <View style={styles.choices}>
-        {upgradeChoices.map((upgrade, index) => (
-          <UpgradeCard
-            key={upgrade.id}
-            upgrade={upgrade}
-            index={index}
-            onSelect={handleSelect}
-          />
-        ))}
+      <View style={styles.summaryBox}>
+        <View style={styles.rewardRow}>
+          <Text style={styles.rewardLabel}>Gold Found:</Text>
+          <Text style={styles.rewardValue}>+ {lastGoldGained} 💰</Text>
+        </View>
+        <View style={styles.rewardRow}>
+          <Text style={styles.rewardLabel}>XP Gained:</Text>
+          <Text style={styles.rewardValue}>+ {lastXpGained} ✨</Text>
+        </View>
+
+        <View style={styles.xpBarContainer}>
+          <Text style={styles.xpLabel}>Level {player.level} Progress</Text>
+          <View style={styles.xpTrack}>
+            <View style={[styles.xpFill, { width: `${xpProgress}%` }]} />
+          </View>
+          <Text style={styles.xpValue}>{player.xp} / {player.maxXp} XP</Text>
+        </View>
       </View>
 
-      <Text style={styles.hint}>Choose wisely — your next enemy is stronger.</Text>
+      {isLevelingUp ? (
+        <Animated.View entering={FadeInDown.delay(300)} style={styles.levelUpContainer}>
+          <Text style={styles.levelUpTitle}>✨ LEVEL UP! ✨</Text>
+          <Text style={styles.levelUpPrompt}>Choose a blessing for your soul:</Text>
+          <View style={styles.statGrid}>
+            <StatOption icon="❤️" label="Vitality" bonus="+20 Max HP" onPress={() => handleStatSelection('hp')} />
+            <StatOption icon="🧪" label="Wisdom" bonus="+15 Max MP" onPress={() => handleStatSelection('mp')} />
+            <StatOption icon="⚔️" label="Might" bonus="+3 Attack" onPress={() => handleStatSelection('atk')} />
+            <StatOption icon="🛡️" label="Fortitude" bonus="+1 Defense" onPress={() => handleStatSelection('def')} />
+          </View>
+        </Animated.View>
+      ) : (
+        <TouchableOpacity
+          style={styles.continueBtn}
+          onPress={() => useGameStore.getState().selectUpgrade({ apply: p => p })}
+        >
+          <Text style={styles.continueBtnText}>Continue Exploration 🏃</Text>
+        </TouchableOpacity>
+      )}
+
+      <Text style={styles.hint}>Your journey continues deeper into the darkness.</Text>
     </SafeAreaView>
   );
 }
@@ -121,51 +143,121 @@ const styles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 0.5,
   },
-  choices: {
-    gap: 14,
-  },
-  cardWrapper: {},
-  card: {
+  summaryBox: {
     backgroundColor: Colors.bgCard,
-    borderRadius: 20,
-    padding: 22,
-    alignItems: 'center',
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    position: 'relative',
   },
-  cardRecommended: {
-    borderColor: Colors.gold,
-    backgroundColor: '#1a1800',
-  },
-  recBadge: {
-    position: 'absolute',
-    top: -12,
-    backgroundColor: Colors.gold,
-    paddingHorizontal: 12,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  recText: {
-    color: '#000',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  cardIcon: {
-    fontSize: 38,
+  rewardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  cardName: {
+  rewardLabel: {
+    color: Colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  rewardValue: {
+    color: Colors.textPrimary,
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.textPrimary,
+  },
+  xpBarContainer: {
+    marginTop: 20,
+  },
+  xpLabel: {
+    color: Colors.accentLight,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  xpTrack: {
+    height: 12,
+    backgroundColor: Colors.bgElevated,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  xpFill: {
+    height: '100%',
+    backgroundColor: Colors.vibrantPurple,
+  },
+  xpValue: {
+    textAlign: 'right',
+    color: Colors.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  levelUpContainer: {
+    alignItems: 'center',
+  },
+  levelUpTitle: {
+    color: Colors.gold,
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 2,
     marginBottom: 4,
   },
-  cardDesc: {
+  levelUpPrompt: {
+    color: Colors.textPrimary,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  statOption: {
+    width: '45%',
+    backgroundColor: Colors.bgCard,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  statIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  statInfo: {
+    flex: 1,
+  },
+  statLabel: {
     color: Colors.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statBonus: {
+    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  continueBtn: {
+    backgroundColor: Colors.success,
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    shadowColor: Colors.success,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  continueBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   hint: {
     color: Colors.textSecondary,
