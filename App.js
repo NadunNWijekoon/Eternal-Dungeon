@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
+import ExploreScreen from './src/screens/ExploreScreen';
 import GameScreen from './src/screens/GameScreen';
 import UpgradeScreen from './src/screens/UpgradeScreen';
 import ShopScreen from './src/screens/ShopScreen';
@@ -28,6 +29,7 @@ export default function App() {
           }}
         >
           <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Explore" component={ExploreScreen} options={{ animation: 'fade' }} />
           <Stack.Screen name="Game" component={GameScreen} options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="Upgrade" component={UpgradeScreen} options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="Shop" component={ShopScreen} options={{ animation: 'slide_from_bottom' }} />

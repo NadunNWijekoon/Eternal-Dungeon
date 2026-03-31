@@ -27,7 +27,9 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (phase === 'battle' || phase === 'upgrade') {
+    if (phase === 'explore') {
+      navigation.navigate('Explore');
+    } else if (phase === 'combat' || phase === 'battle' || phase === 'upgrade') {
       navigation.navigate('Game');
     } else if (phase === 'shop') {
       navigation.navigate('Shop');

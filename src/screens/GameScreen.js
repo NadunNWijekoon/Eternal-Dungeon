@@ -40,41 +40,33 @@ function HpBar({ current, max, color }) {
   );
 }
 
-// ── Cooldown Button Component ──────────────────────────────────────
-function AttackButton({ onPress, cd, lastAtkTime }) {
-  const progress = useSharedValue(1);
-
-  useEffect(() => {
-    const now = Date.now();
-    const elapsed = now - lastAtkTime;
-    const remaining = Math.max(0, cd - elapsed);
-    
-    if (remaining > 0) {
-      // Start from current elapsed percentage
-      progress.value = elapsed / cd;
-      progress.value = withTiming(1, { duration: remaining, easing: Easing.linear });
-    } else {
-      progress.value = 1;
-    }
-  }, [lastAtkTime, cd]);
-
-  const overlayStyle = useAnimatedStyle(() => ({
-    width: `${(1 - progress.value) * 100}%`,
-  }));
-
-  const isReady = progress.value >= 0.99;
-
+// ── Simple Action Button ──────────────────────────────────────────
+function ActionButton({ onPress, label, color, disabled, icon }) {
   return (
     <TouchableOpacity
-      style={[styles.attackBtn, !isReady && styles.attackBtnDisabled]}
+      style={[styles.actionBtn, { backgroundColor: color || Colors.vibrantPurple }, disabled && styles.actionBtnDisabled]}
       onPress={onPress}
       activeOpacity={0.8}
-      disabled={!isReady}
+      disabled={disabled}
     >
-      <View style={styles.attackBtnContent}>
-        <Animated.View style={[styles.attackCooldownOverlay, overlayStyle]} />
-        <Text style={styles.attackBtnText}>⚔️ ATTACK</Text>
+      <Text style={styles.actionBtnText}>{icon} {label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Spell Item Component ───────────────────────────────────────────
+function SpellItem({ spell, onPress, disabled }) {
+  return (
+    <TouchableOpacity
+      style={[styles.spellItem, disabled && styles.spellItemDisabled]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <View style={styles.spellHeader}>
+        <Text style={styles.spellName}>{spell.emoji} {spell.name}</Text>
+        <Text style={styles.spellCost}>{spell.mpCost} MP</Text>
       </View>
+      <Text style={styles.spellDesc}>{spell.description}</Text>
     </TouchableOpacity>
   );
 }
@@ -83,27 +75,11 @@ function AttackButton({ onPress, cd, lastAtkTime }) {
 export default function GameScreen({ navigation }) {
   const {
     player, enemy, depth, phase, combatLog, floatingNumbers,
-    playerAttack, enemyAttack, removeFloatingNumber, goHome,
+    playerAttack, castSpell, removeFloatingNumber, goHome,
   } = useGameStore();
 
-  const enemyAtkTimer = useRef(null);
-
-  // Enemy auto combat
-  useEffect(() => {
-    const scheduleEnemyAttack = () => {
-      if (useGameStore.getState().phase !== 'battle') return;
-      const speed = 1800 * (player?.enemySlowFactor || 1);
-      enemyAtkTimer.current = setTimeout(() => {
-        useGameStore.getState().enemyAttack();
-        scheduleEnemyAttack();
-      }, speed);
-    };
-
-    if (phase === 'battle') {
-      scheduleEnemyAttack();
-    }
-    return () => clearTimeout(enemyAtkTimer.current);
-  }, [phase, enemy?.id, player?.enemySlowFactor]);
+  const [showMagicMenu, setShowMagicMenu] = React.useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   // Phase transitions
   useEffect(() => {
@@ -111,8 +87,34 @@ export default function GameScreen({ navigation }) {
       navigation.navigate('Upgrade');
     } else if (phase === 'dead') {
       navigation.navigate('Dead');
+    } else if (phase === 'explore') {
+      navigation.navigate('Explore');
     }
   }, [phase]);
+
+  const handleAttack = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const ok = playerAttack();
+    if (ok) {
+      // Wait for animations and enemy turn
+      setTimeout(() => setIsProcessing(false), 1600);
+    } else {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCast = (spellId) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const ok = castSpell(spellId);
+    if (ok) {
+      setShowMagicMenu(false);
+      setTimeout(() => setIsProcessing(false), 1600);
+    } else {
+      setIsProcessing(false);
+    }
+  };
 
   if (!player || !enemy) return null;
 
@@ -158,21 +160,66 @@ export default function GameScreen({ navigation }) {
               <Text style={[styles.statValue, { textAlign: 'right' }]}>{enemy.hp}/{enemy.maxHp}</Text>
             </View>
          </View>
+         <View style={[styles.statRow, { marginTop: 10 }]}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>MANA</Text>
+              <HpBar current={player.mana} max={player.maxMana} color={Colors.neonCyan} />
+              <Text style={styles.statValue}>{player.mana}/{player.maxMana} MP</Text>
+            </View>
+            <View style={styles.statBox}>
+               {/* Empty for symmetry */}
+            </View>
+         </View>
       </View>
 
       {/* Action Section */}
-      <View style={styles.actionSection}>
-        <AttackButton
-          onPress={playerAttack}
-          cd={player.atkSpeed || 1200}
-          lastAtkTime={player.lastAtkTime}
-        />
-        
-        <View style={styles.miniStats}>
-          <Text style={styles.statPill}>⚔️ {player.atk + (player.bonusAtk || 0)}</Text>
-          <Text style={styles.statPill}>🛡️ {player.def + (player.bonusDef || 0)}</Text>
-          {player.lifesteal > 0 && <Text style={styles.statPill}>🩸 {player.lifesteal}</Text>}
-        </View>
+      <View style={styles.actionSectionOuter}>
+        {!showMagicMenu ? (
+          <View style={styles.mainMenu}>
+            <ActionButton 
+              label="ATTACK" 
+              icon="⚔️" 
+              onPress={handleAttack} 
+              disabled={isProcessing} 
+            />
+            <ActionButton 
+              label="MAGIC" 
+              icon="✨" 
+              color={Colors.neonCyan}
+              onPress={() => setShowMagicMenu(true)} 
+              disabled={isProcessing} 
+            />
+            <ActionButton 
+              label="FLEE" 
+              icon="🏃" 
+              color={Colors.danger}
+              onPress={() => goHome()} 
+              disabled={isProcessing} 
+            />
+          </View>
+        ) : (
+          <View style={styles.magicMenu}>
+            <View style={styles.magicHeader}>
+              <Text style={styles.magicTitle}>SPELLBOOK</Text>
+              <TouchableOpacity onPress={() => setShowMagicMenu(false)}>
+                <Text style={styles.closeMagic}>CLOSE [X]</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spellScroll}>
+              {player.spellbook.map(sid => {
+                const sp = require('../game/spells').SPELLS[sid];
+                return (
+                  <SpellItem 
+                    key={sid} 
+                    spell={sp} 
+                    disabled={player.mana < sp.mpCost || isProcessing} 
+                    onPress={() => handleCast(sid)}
+                  />
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Combat Log */}
@@ -262,46 +309,87 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 10,
   },
-  attackBtn: {
-    height: 60,
-    backgroundColor: Colors.vibrantPurple,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-    elevation: 8,
-    shadowColor: Colors.vibrantPurple,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-  },
-  attackBtnDisabled: {
-    backgroundColor: Colors.bgElevated,
-    borderColor: 'transparent',
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  attackBtnContent: {
-    flex: 1,
+  actionBtn: {
+    height: 54,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  attackCooldownOverlay: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: Colors.cooldownFill,
+  actionBtnDisabled: {
+    opacity: 0.5,
+    backgroundColor: Colors.bgElevated,
   },
-  attackBtnText: {
-    color: Colors.textPrimary,
-    fontSize: 20,
+  actionBtnText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '900',
-    letterSpacing: 2,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: 1,
+  },
+  actionSectionOuter: {
+    marginBottom: 10,
+    minHeight: 120,
+  },
+  mainMenu: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  magicMenu: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  magicHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  magicTitle: {
+    color: Colors.neonCyan,
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  closeMagic: {
+    color: Colors.danger,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  spellScroll: {
+    gap: 10,
+  },
+  spellItem: {
+    width: 200,
+    backgroundColor: Colors.bgElevated,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  spellItemDisabled: {
+    opacity: 0.3,
+  },
+  spellHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  spellName: {
+    color: Colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  spellCost: {
+    color: Colors.neonCyan,
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  spellDesc: {
+    color: Colors.textSecondary,
+    fontSize: 11,
   },
   miniStats: {
     flexDirection: 'row',
