@@ -7,7 +7,16 @@
 
 ## 📱 Overview
 
-Eternal Dungeon is a fast-paced, addictive mobile roguelike where you auto-fight increasingly powerful enemies, collect gold, choose upgrades, and see how deep you can descend — all fully offline, no internet required.
+Eternal Dungeon is a fast-paced, addictive mobile roguelike where you **manually battle** increasingly powerful enemies in a **visual 2D arena**, collect gold, choose upgrades, and see how deep you can descend — all fully offline, no internet required.
+
+---
+
+## 🕹️ New: Virtual Battlefield
+
+Experience the dungeon like never before with our **Visual Battlefield**:
+- **Dynamic Animations**: See your hero lunge, dodge, and react to every hit in real-time.
+- **Arcade Visuals**: Neon-grid arenas, scanline overlays, and high-quality sprite effects.
+- **Spatial Feedback**: Damage numbers and status effects appear directly within the combat zone.
 
 ---
 
@@ -19,11 +28,12 @@ Eternal Dungeon is a fast-paced, addictive mobile roguelike where you auto-fight
 ```
 
 1. **Enter the dungeon** — tap *Begin Descent* from the home screen  
-2. **Auto-combat begins** — your hero and the enemy attack each other automatically  
-3. **Enemy defeated** — choose 1 of 3 upgrade cards (one is ⭐ Recommended for your build)  
-4. **Go deeper** — each room gets harder; enemy stats scale with depth  
-5. **Death** — gold earned is saved; your permanent upgrades carry over forever  
-6. **Shop** — spend gold between runs for permanent stat boosts
+2. **Manual Combat** — Tap the **⚔️ ATTACK** button to strike; your **Attack Speed** determines your cooldown.
+3. **Enemy counter-attacks** — Enemies hit you on their own timers; time your strikes and manage your HP!
+4. **Enemy defeated** — choose 1 of 3 upgrade cards (one is ⭐ Recommended for your build)  
+5. **Go deeper** — each room gets harder; enemy stats scale with depth  
+6. **Death** — gold earned is saved; your permanent upgrades carry over forever  
+7. **Shop** — spend gold between runs for permanent stat boosts
 
 ---
 
@@ -110,14 +120,15 @@ Eternal Dungeon/
 └── src/
     ├── game/
     │   ├── engine.js             # Enemy generation, damage calc, gold rewards
-    │   └── upgrades.js           # All upgrades + smart recommendation logic
+    │   ├── upgrades.js           # All upgrades + smart recommendation logic
+    │   └── Battlefield.js        # NEW: Animated visual arena component
     ├── store/
     │   └── useGameStore.js       # Zustand store — all game state & save/load
     ├── theme/
-    │   └── colors.js             # Dark theme color palette
+    │   └── colors.js             # Arcade-neon color palette
     └── screens/
         ├── HomeScreen.js         # Title screen
-        ├── GameScreen.js         # Auto-combat battle view
+        ├── GameScreen.js         # Manual combat battle view
         ├── UpgradeScreen.js      # Post-battle reward selection
         ├── ShopScreen.js         # Persistent upgrade shop
         └── DeadScreen.js         # Game-over / run summary
