@@ -20,6 +20,8 @@ const DEFAULT_PLAYER = {
   goldMultiplier: 1,
   enemySlowFactor: 1,
   skills: [],
+  lastAtkTime: 0,
+  isAttacking: false,
 };
 
 const DEFAULT_PERMA = {
@@ -95,7 +97,24 @@ export const useGameStore = create((set, get) => ({
   // ── Player attacks enemy ──────────────────────────────────
   playerAttack: () => {
     const { player, enemy, combatLog } = get();
-    if (!player || !enemy || enemy.hp <= 0) return;
+    if (!player || !enemy || enemy.hp <= 0) return false;
+
+    // Cooldown check
+    const now = Date.now();
+    const cd = player.atkSpeed || 1200;
+    if (now - player.lastAtkTime < cd) return false;
+
+    // Trigger attack animation state
+    set((state) => ({
+      player: { ...state.player, isAttacking: true, lastAtkTime: now },
+    }));
+
+    // Reset animation state after a short delay
+    setTimeout(() => {
+      set((state) => ({
+        player: { ...state.player, isAttacking: false },
+      }));
+    }, 300);
 
     const isCrit = chance(player.critChance || 0.05);
     const totalAtk = player.atk + (player.bonusAtk || 0);
@@ -119,7 +138,12 @@ export const useGameStore = create((set, get) => ({
 
     set((state) => ({
       enemy: { ...state.enemy, hp: newEnemyHp },
-      player: healAmt > 0 ? { ...state.player, hp: newPlayerHp } : state.player,
+      player: {
+        ...state.player,
+        hp: healAmt > 0 ? newPlayerHp : state.player.hp,
+        isAttacking: state.player.isAttacking, // preserve
+        lastAtkTime: state.player.lastAtkTime, // preserve
+      },
       combatLog: [log, ...state.combatLog].slice(0, 20),
       floatingNumbers: [...state.floatingNumbers, figNum].slice(-6),
     }));
@@ -127,12 +151,26 @@ export const useGameStore = create((set, get) => ({
     if (newEnemyHp <= 0) {
       get().handleEnemyDeath();
     }
+    return true;
   },
 
   // ── Enemy attacks player ──────────────────────────────────
   enemyAttack: () => {
     const { player, enemy, combatLog } = get();
     if (!player || !enemy || enemy.hp <= 0 || player.hp <= 0) return;
+
+    // Trigger attack animation state
+    set((state) => ({
+      enemy: { ...state.enemy, isAttacking: true },
+    }));
+
+    setTimeout(() => {
+      if (get().enemy) {
+        set((state) => ({
+          enemy: { ...state.enemy, isAttacking: false },
+        }));
+      }
+    }, 300);
 
     const dmg = calcDamage(enemy.atk, player.def + (player.bonusDef || 0));
     const newHp = Math.max(0, player.hp - dmg);
@@ -147,6 +185,7 @@ export const useGameStore = create((set, get) => ({
 
     set((state) => ({
       player: { ...state.player, hp: newHp },
+      enemy: state.enemy, // preserve animation state
       combatLog: [log, ...state.combatLog].slice(0, 20),
       floatingNumbers: [...state.floatingNumbers, figNum].slice(-6),
     }));

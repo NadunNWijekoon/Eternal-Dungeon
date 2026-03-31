@@ -14,4 +14,10 @@ export const Colors = {
   enemyBar: '#7c4dff',
   crit: '#ff6d00',
   border: '#2a2a3e',
+  // Arcade Expansion
+  vibrantPurple: '#9d50bb',
+  neonCyan: '#00f2fe',
+  hitFlash: '#fff',
+  cooldownFill: 'rgba(0, 242, 254, 0.3)',
+  gridLine: 'rgba(124, 77, 255, 0.1)',
 };

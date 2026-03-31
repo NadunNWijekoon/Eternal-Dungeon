@@ -1,5 +1,4 @@
-// GameScreen.js - Main battle screen with auto-combat and HUD
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,15 +12,12 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSequence,
-  withSpring,
   Easing,
   FadeIn,
-  FadeOut,
-  SlideInRight,
 } from 'react-native-reanimated';
 import { useGameStore } from '../store/useGameStore';
 import { Colors } from '../theme/colors';
+import Battlefield from '../game/Battlefield';
 
 // ── HP Bar Component ───────────────────────────────────────────────
 function HpBar({ current, max, color }) {
@@ -29,7 +25,7 @@ function HpBar({ current, max, color }) {
   const barWidth = useSharedValue(ratio);
 
   useEffect(() => {
-    barWidth.value = withTiming(ratio, { duration: 400, easing: Easing.out(Easing.quad) });
+    barWidth.value = withTiming(ratio, { duration: 400 });
   }, [ratio]);
 
   const barStyle = useAnimatedStyle(() => ({
@@ -44,74 +40,42 @@ function HpBar({ current, max, color }) {
   );
 }
 
-// ── Floating Damage Number ─────────────────────────────────────────
-function FloatingNumber({ item, onDone }) {
-  const translateY = useSharedValue(0);
-  const opacity = useSharedValue(1);
+// ── Cooldown Button Component ──────────────────────────────────────
+function AttackButton({ onPress, cd, lastAtkTime }) {
+  const progress = useSharedValue(1);
 
   useEffect(() => {
-    translateY.value = withTiming(-60, { duration: 900, easing: Easing.out(Easing.quad) });
-    opacity.value = withSequence(
-      withTiming(1, { duration: 100 }),
-      withTiming(0, { duration: 800 })
-    );
-    const t = setTimeout(onDone, 950);
-    return () => clearTimeout(t);
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return (
-    <Animated.Text
-      style={[
-        styles.floatNum,
-        { color: item.isCrit ? Colors.crit : item.side === 'player' ? Colors.danger : Colors.accentLight },
-        style,
-      ]}
-    >
-      {item.isCrit ? `💥${item.value}!` : `-${item.value}`}
-    </Animated.Text>
-  );
-}
-
-// ── EnemyCard Component ────────────────────────────────────────────
-function EnemyCard({ enemy }) {
-  const shake = useSharedValue(0);
-  const prevHp = useRef(enemy.hp);
-
-  useEffect(() => {
-    if (enemy.hp < prevHp.current) {
-      shake.value = withSequence(
-        withTiming(-8, { duration: 60 }),
-        withTiming(8, { duration: 60 }),
-        withTiming(-5, { duration: 60 }),
-        withTiming(0, { duration: 60 })
-      );
+    const now = Date.now();
+    const elapsed = now - lastAtkTime;
+    const remaining = Math.max(0, cd - elapsed);
+    
+    if (remaining > 0) {
+      // Start from current elapsed percentage
+      progress.value = elapsed / cd;
+      progress.value = withTiming(1, { duration: remaining, easing: Easing.linear });
+    } else {
+      progress.value = 1;
     }
-    prevHp.current = enemy.hp;
-  }, [enemy.hp]);
+  }, [lastAtkTime, cd]);
 
-  const shakeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shake.value }],
+  const overlayStyle = useAnimatedStyle(() => ({
+    width: `${(1 - progress.value) * 100}%`,
   }));
 
+  const isReady = progress.value >= 0.99;
+
   return (
-    <Animated.View style={[styles.enemyCard, { borderColor: enemy.color + '40' }, shakeStyle]}>
-      <Text style={styles.enemyEmoji}>{enemy.emoji}</Text>
-      <Text style={[styles.enemyName, { color: enemy.color }]}>{enemy.type}</Text>
-      <Text style={styles.enemyDesc}>{enemy.description}</Text>
-      <View style={styles.hpRow}>
-        <Text style={styles.hpLabel}>HP</Text>
-        <HpBar current={enemy.hp} max={enemy.maxHp} color={Colors.enemyBar} />
-        <Text style={styles.hpText}>{enemy.hp}/{enemy.maxHp}</Text>
+    <TouchableOpacity
+      style={[styles.attackBtn, !isReady && styles.attackBtnDisabled]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      disabled={!isReady}
+    >
+      <View style={styles.attackBtnContent}>
+        <Animated.View style={[styles.attackCooldownOverlay, overlayStyle]} />
+        <Text style={styles.attackBtnText}>⚔️ ATTACK</Text>
       </View>
-      <View style={styles.enemyStats}>
-        <Text style={styles.enemyStatText}>⚔️ {enemy.atk}  🛡️ {enemy.def}</Text>
-      </View>
-    </Animated.View>
+    </TouchableOpacity>
   );
 }
 
@@ -122,38 +86,26 @@ export default function GameScreen({ navigation }) {
     playerAttack, enemyAttack, removeFloatingNumber, goHome,
   } = useGameStore();
 
-  const playerAtkTimer = useRef(null);
   const enemyAtkTimer = useRef(null);
 
-  // Auto combat intervals
-  const schedulePlayerAttack = useCallback(() => {
-    if (!player || !enemy) return;
-    playerAtkTimer.current = setTimeout(() => {
-      useGameStore.getState().playerAttack();
-      if (useGameStore.getState().phase === 'battle') schedulePlayerAttack();
-    }, player.atkSpeed);
-  }, [player?.atkSpeed]);
-
-  const scheduleEnemyAttack = useCallback(() => {
-    if (!player || !enemy) return;
-    const speed = 1800 * (player.enemySlowFactor || 1);
-    enemyAtkTimer.current = setTimeout(() => {
-      useGameStore.getState().enemyAttack();
-      if (useGameStore.getState().phase === 'battle') scheduleEnemyAttack();
-    }, speed);
-  }, [player?.enemySlowFactor]);
-
+  // Enemy auto combat
   useEffect(() => {
+    const scheduleEnemyAttack = () => {
+      if (useGameStore.getState().phase !== 'battle') return;
+      const speed = 1800 * (player?.enemySlowFactor || 1);
+      enemyAtkTimer.current = setTimeout(() => {
+        useGameStore.getState().enemyAttack();
+        scheduleEnemyAttack();
+      }, speed);
+    };
+
     if (phase === 'battle') {
-      schedulePlayerAttack();
       scheduleEnemyAttack();
     }
-    return () => {
-      clearTimeout(playerAtkTimer.current);
-      clearTimeout(enemyAtkTimer.current);
-    };
-  }, [phase, enemy?.id]);
+    return () => clearTimeout(enemyAtkTimer.current);
+  }, [phase, enemy?.id, player?.enemySlowFactor]);
 
+  // Phase transitions
   useEffect(() => {
     if (phase === 'upgrade') {
       navigation.navigate('Upgrade');
@@ -165,8 +117,7 @@ export default function GameScreen({ navigation }) {
   if (!player || !enemy) return null;
 
   const hpRatio = player.hp / player.maxHp;
-  const hpColor =
-    hpRatio > 0.5 ? Colors.success : hpRatio > 0.25 ? Colors.gold : Colors.danger;
+  const hpColor = hpRatio > 0.5 ? Colors.success : hpRatio > 0.25 ? Colors.gold : Colors.danger;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -182,62 +133,44 @@ export default function GameScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Enemy */}
-      <View style={styles.enemySection}>
-        {enemy && <EnemyCard enemy={enemy} />}
+      {/* Visual Battlefield */}
+      <Animated.View entering={FadeIn.duration(600)} style={styles.battlefieldContainer}>
+        <Battlefield
+          player={player}
+          enemy={enemy}
+          floatingNumbers={floatingNumbers}
+          removeFloatingNumber={removeFloatingNumber}
+        />
+      </Animated.View>
 
-        {/* Floating numbers for enemy */}
-        <View style={styles.floatZoneEnemy} pointerEvents="none">
-          {floatingNumbers
-            .filter((f) => f.side === 'enemy')
-            .map((f) => (
-              <FloatingNumber
-                key={f.id}
-                item={f}
-                onDone={() => removeFloatingNumber(f.id)}
-              />
-            ))}
-        </View>
+      {/* Stats & HP HUD */}
+      <View style={styles.statsHud}>
+         <View style={styles.statRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>HERO HP</Text>
+              <HpBar current={player.hp} max={player.maxHp} color={hpColor} />
+              <Text style={styles.statValue}>{player.hp}/{player.maxHp}</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={[styles.statLabel, { textAlign: 'right' }]}>{enemy.type} HP</Text>
+              <HpBar current={enemy.hp} max={enemy.maxHp} color={Colors.enemyBar} />
+              <Text style={[styles.statValue, { textAlign: 'right' }]}>{enemy.hp}/{enemy.maxHp}</Text>
+            </View>
+         </View>
       </View>
 
-      {/* Player HUD */}
-      <View style={styles.playerSection}>
-        <View style={styles.playerCard}>
-          <View style={styles.playerTop}>
-            <Text style={styles.playerEmoji}>🧙</Text>
-            <View style={styles.playerInfo}>
-              <Text style={styles.playerLabel}>HERO</Text>
-              <View style={styles.hpRow}>
-                <Text style={styles.hpLabel}>HP</Text>
-                <HpBar current={player.hp} max={player.maxHp} color={hpColor} />
-                <Text style={styles.hpText}>{player.hp}/{player.maxHp}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Floating numbers for player */}
-          <View style={styles.floatZonePlayer} pointerEvents="none">
-            {floatingNumbers
-              .filter((f) => f.side === 'player')
-              .map((f) => (
-                <FloatingNumber
-                  key={f.id}
-                  item={f}
-                  onDone={() => removeFloatingNumber(f.id)}
-                />
-              ))}
-          </View>
-
-          <View style={styles.playerStats}>
-            <Text style={styles.statPill}>⚔️ {player.atk + (player.bonusAtk || 0)}</Text>
-            <Text style={styles.statPill}>🛡️ {player.def + (player.bonusDef || 0)}</Text>
-            {(player.critChance || 0) > 0.05 && (
-              <Text style={styles.statPill}>💥 {Math.round((player.critChance || 0) * 100)}%</Text>
-            )}
-            {(player.lifesteal || 0) > 0 && (
-              <Text style={styles.statPill}>🩸 {player.lifesteal}</Text>
-            )}
-          </View>
+      {/* Action Section */}
+      <View style={styles.actionSection}>
+        <AttackButton
+          onPress={playerAttack}
+          cd={player.atkSpeed || 1200}
+          lastAtkTime={player.lastAtkTime}
+        />
+        
+        <View style={styles.miniStats}>
+          <Text style={styles.statPill}>⚔️ {player.atk + (player.bonusAtk || 0)}</Text>
+          <Text style={styles.statPill}>🛡️ {player.def + (player.bonusDef || 0)}</Text>
+          {player.lifesteal > 0 && <Text style={styles.statPill}>🩸 {player.lifesteal}</Text>}
         </View>
       </View>
 
@@ -252,9 +185,9 @@ export default function GameScreen({ navigation }) {
         </ScrollView>
       </View>
 
-      {/* Flee button */}
-      <TouchableOpacity style={styles.fleeBtn} onPress={goHome} activeOpacity={0.7}>
-        <Text style={styles.fleeBtnText}>🏃 Flee</Text>
+      {/* Footer */}
+      <TouchableOpacity style={styles.fleeBtn} onPress={goHome}>
+        <Text style={styles.fleeBtnText}>🏃 Flee to Home</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -264,168 +197,132 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.bg,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   hud: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 12,
+    paddingBottom: 10,
   },
-  hudLeft: {},
-  hudRight: {},
   depthText: {
-    color: Colors.accentLight,
-    fontWeight: '800',
-    fontSize: 14,
-    letterSpacing: 2,
+    color: Colors.neonCyan,
+    fontWeight: '900',
+    fontSize: 16,
+    letterSpacing: 3,
   },
   goldText: {
     color: Colors.gold,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  enemySection: {
-    flex: 1.4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  enemyCard: {
-    width: '100%',
-    backgroundColor: Colors.bgCard,
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  enemyEmoji: {
-    fontSize: 56,
-    marginBottom: 6,
-  },
-  enemyName: {
-    fontSize: 22,
     fontWeight: '800',
+    fontSize: 16,
+  },
+  battlefieldContainer: {
+    // Ensuring the battlefield is centered and has some space
+  },
+  statsHud: {
+    marginBottom: 10,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  statBox: {
+    flex: 1,
+  },
+  statLabel: {
+    color: Colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '800',
+    marginBottom: 4,
     letterSpacing: 1,
   },
-  enemyDesc: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    marginTop: 4,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  hpRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    gap: 8,
-    marginVertical: 4,
-  },
-  hpLabel: {
-    color: Colors.textSecondary,
+  statValue: {
+    color: Colors.textPrimary,
     fontSize: 11,
     fontWeight: '700',
-    width: 22,
+    marginTop: 2,
   },
   hpTrack: {
-    flex: 1,
-    height: 8,
+    height: 10,
     backgroundColor: Colors.bgElevated,
-    borderRadius: 4,
+    borderRadius: 5,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   hpFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 5,
   },
-  hpText: {
-    color: Colors.textSecondary,
-    fontSize: 11,
-    width: 52,
-    textAlign: 'right',
+  actionSection: {
+    gap: 12,
+    marginBottom: 10,
   },
-  enemyStats: {
-    marginTop: 6,
+  attackBtn: {
+    height: 60,
+    backgroundColor: Colors.vibrantPurple,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    elevation: 8,
+    shadowColor: Colors.vibrantPurple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
-  enemyStatText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
+  attackBtnDisabled: {
+    backgroundColor: Colors.bgElevated,
+    borderColor: 'transparent',
+    elevation: 0,
+    shadowOpacity: 0,
   },
-  floatZoneEnemy: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+  attackBtnContent: {
+    flex: 1,
     alignItems: 'center',
-    pointerEvents: 'none',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  floatZonePlayer: {
+  attackCooldownOverlay: {
     position: 'absolute',
-    right: 0,
+    left: 0,
     top: 0,
-    alignItems: 'flex-end',
-    pointerEvents: 'none',
+    bottom: 0,
+    backgroundColor: Colors.cooldownFill,
   },
-  floatNum: {
+  attackBtnText: {
+    color: Colors.textPrimary,
     fontSize: 20,
     fontWeight: '900',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  playerSection: {
-    flex: 1,
+  miniStats: {
+    flexDirection: 'row',
     justifyContent: 'center',
+    gap: 8,
   },
-  playerCard: {
+  statPill: {
     backgroundColor: Colors.bgCard,
-    borderRadius: 16,
-    padding: 14,
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  playerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  playerEmoji: {
-    fontSize: 36,
-  },
-  playerInfo: {
-    flex: 1,
-  },
-  playerLabel: {
-    color: Colors.accentLight,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: 4,
-  },
-  playerStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-  },
-  statPill: {
-    backgroundColor: Colors.bgElevated,
-    color: Colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
   logSection: {
-    flex: 0.8,
-    backgroundColor: Colors.bgCard,
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 8,
+    flex: 1,
+    backgroundColor: 'rgba(18,18,28,0.8)',
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -434,24 +331,22 @@ const styles = StyleSheet.create({
   },
   logEntry: {
     color: Colors.textSecondary,
-    fontSize: 12,
-    marginBottom: 3,
+    fontSize: 13,
+    marginBottom: 4,
   },
   logLatest: {
-    color: Colors.textPrimary,
-    fontWeight: '600',
+    color: Colors.neonCyan,
+    fontWeight: '700',
   },
   fleeBtn: {
-    marginTop: 10,
-    borderRadius: 12,
+    marginTop: 12,
     paddingVertical: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   fleeBtnText: {
-    color: Colors.textSecondary,
+    color: Colors.danger,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 1,
   },
 });
