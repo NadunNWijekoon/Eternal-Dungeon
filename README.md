@@ -7,33 +7,35 @@
 
 ## 📱 Overview
 
-Eternal Dungeon is a fast-paced, addictive mobile roguelike where you **manually battle** increasingly powerful enemies in a **visual 2D arena**, collect gold, choose upgrades, and see how deep you can descend — all fully offline, no internet required.
+Eternal Dungeon is an **"Ultima"-style CRPG** roguelike where you explore procedurally generated 2D dungeons, engage in **tactical turn-based combat**, cast powerful spells, and see how deep you can descend — all fully offline, no internet required.
 
 ---
 
-## 🕹️ New: Virtual Battlefield
+## 🕹️ New: Classic CRPG Overhaul
 
-Experience the dungeon like never before with our **Visual Battlefield**:
-- **Dynamic Graphical Environments**: High-quality pixel-art backgrounds cycle depending on your depth (Dark Forest, Ruined Village, Dungeon Crypt).
-- **Dynamic Animations**: See your hero lunge, dodge, and react to every hit in real-time.
-- **Spatial Feedback**: Damage numbers and status effects appear directly within the combat zone.
+Experience the dungeon with our new **Procedural 2D Grid**:
+- **Exploration**: Navigate a procedurally generated dungeon grid with a top-down view using the on-screen D-Pad.
+- **Classic 16-bit Aesthetic**: Retro pixel-art tiles for walls, floors, the hero, and enemies.
+- **Tactical Combat**: A dedicated turn-based combat screen requiring strategic use of [Attack], [Magic], or [Flee].
+- **Robust Magic System**: Manage your Mana (MP) and unleash spells like *Fireball* or patch yourself up with *Heal*.
 
 ---
 
 ## 🎮 Gameplay Loop
 
 ```
-🏠 Home → ⚔️ Battle → ✨ Choose Upgrade → ⚔️ Deeper Battle → 💀 Die → 🏠 Home
+🏠 Home → 🗺️ Explore Grid → ⚔️ Tactical Combat → ✨ Progress & Level Up → 💀 Die → 🏠 Home
                                                                      (gold & perma-upgrades kept)
 ```
 
-1. **Enter the dungeon** — tap *Begin Descent* from the home screen  
-2. **Manual Combat** — Tap the **⚔️ ATTACK** button to strike; your **Attack Speed** determines your cooldown.
-3. **Enemy counter-attacks** — Enemies hit you on their own timers; time your strikes and manage your HP!
-4. **Enemy defeated** — choose 1 of 3 upgrade cards (one is ⭐ Recommended for your build)  
-5. **Go deeper** — each room gets harder; enemy stats scale with depth  
-6. **Death** — gold earned is saved; your permanent upgrades carry over forever  
-7. **Shop** — spend gold between runs for permanent stat boosts
+1. **Enter the dungeon** — tap *Begin Descent* from the home screen
+2. **Explore** — Move around the 2D grid dungeon to discover paths and map out the area.
+3. **Tactical Combat** — Bumping into an enemy transitions you to turn-based combat. Choose your action: Attack, Magic, or Flee.
+4. **Enemy turns** — Enemies attack logically after your action resolves.
+5. **Leveling Up** — Gain XP from defeated enemies to raise your Level, Max HP, and Max MP.
+6. **Go deeper** — each room gets harder; enemy stats scale with depth.
+7. **Death** — gold earned is saved; your permanent upgrades carry over forever.
+8. **Shop** — spend gold between runs for permanent stat boosts.
 
 ---
 
@@ -121,14 +123,17 @@ Eternal Dungeon/
     ├── game/
     │   ├── engine.js             # Enemy generation, damage calc, gold rewards
     │   ├── upgrades.js           # All upgrades + smart recommendation logic
-    │   └── Battlefield.js        # NEW: Animated visual arena component
+    │   ├── mapGenerator.js       # NEW: Procedural BSP 2D dungeon generator
+    │   ├── spells.js             # NEW: Magic system and definitions
+    │   └── Battlefield.js        # Animated visual arena component
     ├── store/
-    │   └── useGameStore.js       # Zustand store — all game state & save/load
+    │   └── useGameStore.js       # Zustand store — CRPG state, grid coords, etc.
     ├── theme/
     │   └── colors.js             # Arcade-neon color palette
     └── screens/
         ├── HomeScreen.js         # Title screen
-        ├── GameScreen.js         # Manual combat battle view
+        ├── ExploreScreen.js      # NEW: Top-down 2D grid exploration map
+        ├── GameScreen.js         # Turn-based tactical combat view
         ├── UpgradeScreen.js      # Post-battle reward selection
         ├── ShopScreen.js         # Persistent upgrade shop
         └── DeadScreen.js         # Game-over / run summary
