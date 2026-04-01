@@ -109,6 +109,20 @@ npx expo start --android   # Android emulator
 npx expo start --ios       # iOS simulator (macOS only)
 ```
 
+### 🎨 Asset Restoration
+
+If tiles, backgrounds, or sounds are missing, run the following scripts to restore or generate them:
+
+```bash
+# 1. Restore high-quality tiles and backgrounds from previous sessions
+node setup_tiles.js
+node copy.js
+
+# 2. Generate 8-bit beep sounds and pixel art branding
+python scripts/generate_beep.py
+python scripts/generate_assets.py
+```
+
 ---
 
 ## 🗂️ Project Structure
@@ -130,9 +144,17 @@ Eternal Dungeon/
     │   └── useGameStore.js       # Zustand store — CRPG state, grid coords, etc.
     ├── theme/
     │   └── colors.js             # Arcade-neon color palette
+    ├── scripts/
+    │   ├── generate_assets.py    # Pixel art and icon generator (PIL)
+    │   ├── generate_beep.py      # 8-bit sound effect generator (Wave)
+    │   └── verify_assets.py      # Asset integrity checker
+    ├── assets/                   # RESTORED: All game media
+    │   ├── tiles/                # wall.png, floor.png, player.png
+    │   ├── images/               # forest.png, dungeon.png, village.png
+    │   └── audio/                # slash.wav, hit.wav, ui.wav, win.wav
     └── screens/
         ├── HomeScreen.js         # Title screen
-        ├── ExploreScreen.js      # NEW: Top-down 2D grid exploration map
+        ├── ExploreScreen.js      # Top-down 2D grid exploration map
         ├── GameScreen.js         # Turn-based tactical combat view
         ├── UpgradeScreen.js      # Post-battle reward selection
         ├── ShopScreen.js         # Persistent upgrade shop
@@ -174,7 +196,7 @@ To ensure stability with Expo SDK 52 and React 18.3.1, this project includes:
 
 ## 🗺️ Roadmap
 
-- [ ] Sound effects (attack, hit, level up)
+- [x] Sound effects (8-bit beeps for attack, hit, UI)
 - [ ] Haptic feedback
 - [ ] Boss enemies every 5 floors
 - [ ] Daily offline challenges
