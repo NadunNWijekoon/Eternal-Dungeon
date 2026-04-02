@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ImageBackground, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -84,6 +84,41 @@ const getBgImage = (depth) => {
   return require('../../assets/images/forest.png'); // 1, 2, 3
 };
 
+// ── Hero Character Center Pointer ───────────────────────────────
+function HeroCharacter({ player }) {
+  const pulse = useSharedValue(1);
+
+  useEffect(() => {
+    pulse.value = withSequence(
+      withTiming(1.1, { duration: 600 }),
+      withTiming(1, { duration: 600 })
+    );
+    const interval = setInterval(() => {
+      pulse.value = withSequence(
+        withTiming(1.1, { duration: 600 }),
+        withTiming(1, { duration: 600 })
+      );
+    }, 1200);
+    return () => clearInterval(interval);
+  }, []);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
+  return (
+    <Animated.View style={[styles.heroContainer, pulseStyle]}>
+      <View style={styles.heroPulseRing} />
+      <Image
+        source={require('../../assets/tiles/player.png')}
+        style={styles.heroImage}
+        resizeMode="contain"
+      />
+      <Text style={styles.heroLabel}>HERO</Text>
+    </Animated.View>
+  );
+}
+
 // ── Main Battlefield Arena ──────────────────────────────────────────
 export default function Battlefield({ player, enemy, floatingNumbers, removeFloatingNumber, depth }) {
   const bgImg = getBgImage(depth);
@@ -92,6 +127,9 @@ export default function Battlefield({ player, enemy, floatingNumbers, removeFloa
     <ImageBackground source={bgImg} style={styles.arena} imageStyle={styles.bgImageStyle}>
       {/* Atmospheric dark gradient overlay for lower half to make sprites pop */}
       <View style={styles.bottomShadow} />
+
+      {/* Hero Character Center Pointer */}
+      <HeroCharacter player={player} />
 
       {/* Units */}
       <AnimatedUnit
@@ -223,5 +261,44 @@ const styles = StyleSheet.create({
   scanline: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 242, 254, 0.01)', // Very faint overlay
+  },
+  heroContainer: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: -60,
+    marginTop: -70,
+    width: 120,
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
+  heroPulseRing: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 2,
+    borderColor: 'rgba(124, 77, 255, 0.4)',
+    opacity: 0.6,
+  },
+  heroImage: {
+    width: 100,
+    height: 100,
+    tintColor: Colors.accentLight,
+  },
+  heroLabel: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '900',
+    color: Colors.accentLight,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 });

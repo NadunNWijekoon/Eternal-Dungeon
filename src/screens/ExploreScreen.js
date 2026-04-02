@@ -1,12 +1,17 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, ScrollView } from 'react-native';
 import { useGameStore } from '../store/useGameStore';
 import { TILES } from '../game/mapGenerator';
 import { Colors } from '../theme/colors';
 import { Image } from 'react-native';
 
-const { width } = Dimensions.get('window');
-const TILE_SIZE = Math.floor(width / 11); // Show 11x11 grid
+const { width, height } = Dimensions.get('window');
+
+// Responsive design for mobile phones (Pixel 7, Galaxy S20 optimized)
+// These phones typically have ~411-412dp width in portrait
+const GRID_SIZE = 9; // 9x9 grid for better visibility
+const MAX_TILE_SIZE = Math.floor((width - 40) / GRID_SIZE);
+const TILE_SIZE = Math.min(MAX_TILE_SIZE, 45); // Cap at 45px for readability
 
 export default function ExploreScreen({ navigation }) {
   const { currentMap, playerPos, enemiesOnMap, movePlayer, phase, depth, player, combatLog } = useGameStore();
@@ -21,8 +26,8 @@ export default function ExploreScreen({ navigation }) {
 
   if (!currentMap) return <View style={styles.container} />;
 
-  // Render viewport (e.g. 11x11 around player)
-  const viewRadius = 5;
+  // Render viewport (9x9 around player, centered on player)
+  const viewRadius = Math.floor(GRID_SIZE / 2);
   const viewport = [];
   for (let y = playerPos.y - viewRadius; y <= playerPos.y + viewRadius; y++) {
     const row = [];
@@ -35,11 +40,17 @@ export default function ExploreScreen({ navigation }) {
       // Check for entities
       let content = null;
       let style = styles.tileFloor;
+      let highlight = null;
+      
+      const isPlayerHere = x === playerPos.x && y === playerPos.y;
+      const enemy = enemiesOnMap.find(e => e.x === x && e.y === y);
       
       if (tileType === TILES.WALL) {
         style = styles.tileWall;
         content = <Image source={require('../../assets/tiles/wall.png')} style={styles.tileImage} />;
-      } else if (x === playerPos.x && y === playerPos.y) {
+      } else if (isPlayerHere) {
+        style = styles.tilePlayerHere;
+        highlight = styles.playerHighlight;
         content = (
           <>
             <Image source={require('../../assets/tiles/floor.png')} style={styles.tileImageAbsolute} />
@@ -47,7 +58,6 @@ export default function ExploreScreen({ navigation }) {
           </>
         );
       } else {
-        const enemy = enemiesOnMap.find(e => e.x === x && e.y === y);
         content = <Image source={require('../../assets/tiles/floor.png')} style={styles.tileImage} />;
         if (enemy) {
           content = (
@@ -61,6 +71,7 @@ export default function ExploreScreen({ navigation }) {
       
       row.push(
         <View key={`${x},${y}`} style={[styles.tile, style]}>
+          {highlight && <View style={highlight} />}
           {content}
         </View>
       );
@@ -70,25 +81,47 @@ export default function ExploreScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header HUD */}
       <View style={styles.header}>
-        <Text style={styles.headerText}>Depth {depth} - Explorer</Text>
-        <Text style={styles.statsText}>
-          Level {player?.level} | XP: {player?.xp}/{player?.maxXp}
-        </Text>
-        <Text style={styles.statsText}>
-          HP: {player?.hp}/{player?.maxHp} | MP: {player?.mana}/{player?.maxMana}
-        </Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerText}>⛏️ DEPTH {depth}</Text>
+            <Text style={styles.positionText}>Position: ({playerPos.x}, {playerPos.y})</Text>
+          </View>
+          <Text style={styles.levelText}>Lvl {player?.level}</Text>
+        </View>
+        
+        <View style={styles.statsBar}>
+          <Text style={styles.statItem}>
+            HP: <Text style={{ color: player?.hp < player?.maxHp * 0.3 ? Colors.danger : Colors.success }}>
+              {player?.hp}/{player?.maxHp}
+            </Text>
+          </Text>
+          <Text style={styles.statItem}>
+            MP: <Text style={{ color: Colors.neonCyan }}>{player?.mana}/{player?.maxMana}</Text>
+          </Text>
+          <Text style={styles.statItem}>
+            XP: {player?.xp}/{player?.maxXp}
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.mapContainer}>
-        {viewport}
+      {/* Map Grid */}
+      <View style={styles.mapWrapper}>
+        <View style={styles.mapContainer}>
+          {viewport}
+        </View>
       </View>
       
+      {/* Combat Log / Event Display */}
       <View style={styles.logContainer}>
-        <Text style={styles.logText}>{combatLog[0] || '...'}</Text>
+        <Text style={styles.logLabel}>📜 Event:</Text>
+        <Text style={styles.logText}>{combatLog[0] || 'Exploring the dungeon...'}</Text>
       </View>
 
+      {/* D-Pad Controls */}
       <View style={styles.dpadContainer}>
+        <Text style={styles.dpadLabel}>Navigate</Text>
         <View style={styles.dpadRow}>
           <TouchableOpacity style={styles.dpadBtn} onPress={() => movePlayer(0, -1)}>
             <Text style={styles.dpadText}>⬆️</Text>
@@ -117,29 +150,67 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.bg,
-    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 12,
   },
   header: {
-    padding: 20,
-    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   headerText: {
     color: Colors.accent,
-    fontSize: 24,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  positionText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: 'monospace',
+  },
+  levelText: {
+    color: Colors.gold,
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  statsText: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-    marginTop: 5,
+  statsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 6,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(124, 77, 255, 0.08)',
+    borderRadius: 6,
+  },
+  statItem: {
+    color: Colors.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  mapWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 8,
   },
   mapContainer: {
     backgroundColor: Colors.bgCard,
-    padding: 5,
-    borderRadius: 8,
+    padding: 4,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: Colors.accent,
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   row: {
     flexDirection: 'row',
@@ -149,12 +220,26 @@ const styles = StyleSheet.create({
     height: TILE_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   tileFloor: {
-    backgroundColor: '#37474f', // Generic floor dark gray
+    backgroundColor: '#37474f',
   },
   tileWall: {
-    backgroundColor: '#263238', 
+    backgroundColor: '#263238',
+  },
+  tilePlayerHere: {
+    backgroundColor: Colors.bgCard,
+  },
+  playerHighlight: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderWidth: 3,
+    borderColor: Colors.gold,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 215, 79, 0.15)',
   },
   tileImage: {
     width: '100%',
@@ -168,41 +253,63 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   tileEmoji: {
-    fontSize: TILE_SIZE * 0.7,
+    fontSize: TILE_SIZE * 0.65,
+    fontWeight: 'bold',
   },
   logContainer: {
-    height: 40,
+    marginVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(124, 77, 255, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.accent,
+    borderRadius: 4,
+    minHeight: 44,
     justifyContent: 'center',
+  },
+  logLabel: {
+    color: Colors.accent,
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginBottom: 2,
   },
   logText: {
     color: Colors.textPrimary,
-    fontSize: 14,
+    fontSize: 13,
     fontStyle: 'italic',
   },
   dpadContainer: {
-    marginBottom: 40,
+    marginBottom: 16,
     alignItems: 'center',
+  },
+  dpadLabel: {
+    color: Colors.accentLight,
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   dpadRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
   },
   dpadBtn: {
-    width: 60,
-    height: 60,
+    width: 56,
+    height: 56,
     backgroundColor: Colors.bgCard,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  dpadCenter: {
-    width: 60,
-    height: 60,
-    margin: 5,
+    margin: 4,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: Colors.accent,
+    activeOpacity: 0.6,
   },
   dpadText: {
     fontSize: 24,
+  },
+  dpadCenter: {
+    width: 56,
+    height: 56,
+    margin: 4,
   },
 });
