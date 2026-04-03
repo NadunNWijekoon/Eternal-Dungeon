@@ -86,9 +86,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.eternaldungeon"
+    namespace "com.nadunnwijekoon.eternaldungeon"
     defaultConfig {
-        applicationId "com.eternaldungeon"
+        applicationId "com.nadunnwijekoon.eternaldungeon"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
