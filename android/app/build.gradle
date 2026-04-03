@@ -129,6 +129,9 @@ android {
             crunchPngs false
         }
     }
+    buildFeatures {
+        buildConfig true
+    }
     packagingOptions {
         jniLibs {
             useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
